@@ -244,7 +244,7 @@
                 if (cameras && cameras.length) {
                     // 첫 번째 카메라 사용 (또는 사용자에게 선택하게 할 수 있음)
                     await html5QrCode.start(
-                        cameras[0].id, // 카메라 ID
+                        { facingMode: { exact: "environment" } }, // 후면 카메라 요청 (정확히 일치하는 환경 카메라)
                         {
                             fps: 10,    // 프레임당 스캔 시도 횟수
                             qrbox: { width: 250, height: 250 } // QR 코드 스캔 영역
