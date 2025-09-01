@@ -269,7 +269,7 @@
 
         // 스캔 중지 함수
         async function stopScanning() {
-            if (html5QrCode && html5QrCode.is scanning) {
+            if (html5QrCode && html5QrCode.isScanning) {
                 try {
                     await html5QrCode.stop();
                     console.log("QR Code scanning stopped.");
