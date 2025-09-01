@@ -3,352 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR 비밀번호 복호화기 (모바일)</title>
-    <!-- Google Fonts - Noto Sans KR -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <!-- CryptoJS 라이브러리 (AES 복호화) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <!-- html5-qrcode 라이브러리 (QR 코드 스캔) -->
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <title>PWA 바코드 스캐너</title>
+    <!-- PWA Manifest 파일 링크 -->
+    <link rel="manifest" href="manifest.json">
+    <!-- 기본 스타일 (필요에 따라 app.css 파일로 분리 가능) -->
     <style>
-        :root {
-            --primary-color: #4CAF50; /* 현대적인 녹색 계열 */
-            --primary-dark-color: #388E3C;
-            --secondary-color: #2196F3; /* 파란색 계열 */
-            --background-color: #f7f9fc;
-            --surface-color: #ffffff;
-            --text-color: #333333;
-            --subtle-text-color: #666666;
-            --border-color: #e0e0e0;
-            --success-bg: #e8f5e9; /* Light Green */
-            --success-text: #2e7d32; /* Dark Green */
-            --error-bg: #ffebee; /* Light Red */
-            --error-text: #c62828; /* Dark Red */
-        }
-
         body {
-            font-family: 'Noto Sans KR', sans-serif;
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            text-align: center;
-            line-height: 1.6;
-        }
-        .container {
-            background-color: var(--surface-color);
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            max-width: 600px;
-            margin: 30px auto;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            align-items: center;
+            background-color: #f0f2f5;
+            color: #333;
         }
         h1 {
-            color: var(--primary-dark-color);
-            margin-bottom: 10px;
-            font-size: 2em;
-            font-weight: 700;
+            color: #007bff;
+            margin-bottom: 30px;
         }
-        p {
-            color: var(--subtle-text-color);
-            margin-bottom: 15px;
-            font-size: 0.95em;
-        }
-        #qr-reader {
+        #scanner-container {
             width: 100%;
-            max-width: 450px; /* 카메라 미리보기 크기 조절 */
-            margin: 0 auto;
-            border: 1px solid var(--border-color);
+            max-width: 500px;
+            position: relative;
+            background-color: #000;
             border-radius: 8px;
-            overflow: hidden; /* 자식 요소의 모서리 둥글게 처리 */
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
         }
-        button {
-            background-color: var(--primary-color);
+        #video {
+            width: 100%;
+            height: auto;
+            display: block; /* Removes extra space below the video */
+        }
+        #output {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #barcode-value {
+            font-weight: bold;
+            color: #28a745;
+            word-break: break-all;
+        }
+        .controls button {
+            background-color: #007bff;
             color: white;
-            padding: 12px 25px;
             border: none;
-            border-radius: 6px;
+            padding: 12px 25px;
+            margin: 5px;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 1em;
-            font-weight: 500;
-            transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
-            margin-top: 10px;
-            box-shadow: 0 3px 8px rgba(0, 123, 255, 0.2);
-            display: inline-block; /* 버튼 간격 조절을 위해 */
-            margin-left: 5px;
-            margin-right: 5px;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
         }
-        button:hover {
-            background-color: var(--primary-dark-color);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 123, 255, 0.3);
+        .controls button:hover {
+            background-color: #0056b3;
         }
-        button#stopScanButton {
-            background-color: #F44336; /* 빨간색 계열 */
-            box-shadow: 0 3px 8px rgba(244, 67, 54, 0.2);
-        }
-        button#stopScanButton:hover {
-            background-color: #D32F2F;
-            box-shadow: 0 6px 12px rgba(244, 67, 54, 0.3);
-        }
-
-        .button-group {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 10px;
-        }
-
-        .result-box, .error-box {
-            margin-top: 25px;
-            padding: 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            font-size: 1.05em;
-            word-wrap: break-word;
-            text-align: left;
-            min-height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1.5;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-        }
-        .result-box {
-            background-color: var(--success-bg);
-            color: var(--success-text);
-            border: 1px solid #a5d6a7; /* Light Green Border */
-        }
-        .error-box {
-            background-color: var(--error-bg);
-            color: var(--error-text);
-            border: 1px solid #ef9a9a; /* Light Red Border */
-        }
-        .result-box p, .error-box p {
-            margin: 0; /* 내부 p 태그의 기본 마진 제거 */
-            color: inherit; /* 부모 색상 상속 */
-        }
-        .result-box strong, .error-box strong {
-            font-weight: 700;
-            margin-right: 5px;
-        }
-        .result-box span[style*="color: blue;"] {
-            color: var(--secondary-color) !important; /* 복호화된 비밀번호 색상 */
-            font-weight: 700;
-        }
-        
-        .icon {
-            margin-right: 10px;
-            font-size: 1.2em;
+        .controls button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>QR & 바코드 비밀번호 복호화기</h1>
-        <p>카메라로 암호화된 QR 코드와 복호화 키가 담긴 바코드를 동시에 스캔하여 비밀번호를 확인하세요.</p>
-        
-        <div id="qr-reader"></div>
-        
-        <div id="qr-reader-results">
-            <div id="resultBox" class="result-box">
-                <span class="icon">✨</span><p>스캔 대기 중... "스캔 시작" 버튼을 눌러주세요.</p>
-            </div>
-        </div>
-        <div id="errorBox" class="error-box" style="display: none;">
-            <span class="icon">⚠️</span><p>오류가 여기에 표시됩니다.</p>
-        </div>
-        
-        <div class="button-group">
-            <button id="startScanButton">스캔 시작</button>
-            <button id="stopScanButton" style="display: none;">스캔 중지</button>
-        </div>
+    <h1>PWA 바코드 스캐너</h1>
+
+    <div id="scanner-container">
+        <!-- 카메라 피드를 표시할 video 요소 -->
+        <video id="video" playsinline></video>
+        <!-- ZXing-JS에서 내부적으로 canvas를 사용할 수 있으므로, 명시적으로 추가하지 않아도 됩니다. -->
+        <!-- 필요시 디버깅 또는 추가 처리를 위해 사용 가능: <canvas id="canvas" style="display:none;"></canvas> -->
     </div>
 
+    <div id="output">
+        <p>스캔된 바코드: <span id="barcode-value">없음</span></p>
+    </div>
+
+    <div class="controls">
+        <button id="start-scan">스캔 시작</button>
+        <button id="stop-scan" disabled>스캔 중지</button>
+    </div>
+
+    <!-- ZXing-JS 라이브러리 로드 (바코드 스캔 기능 제공) -->
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest"></script>
+    
+    <!-- PWA 및 바코드 스캔 로직을 위한 JavaScript 파일 -->
+    <!-- 이 파일에 카메라 접근, ZXing-JS 초기화, 스캔 결과 처리 등의 코드를 작성합니다. -->
+    <script src="app.js"></script>
+
     <script>
-        const QR_READER_ELEMENT_ID = "qr-reader";
-        const RESULT_BOX_ID = "resultBox";
-        const ERROR_BOX_ID = "errorBox";
-        const START_SCAN_BUTTON_ID = "startScanButton";
-        const STOP_SCAN_BUTTON_ID = "stopScanButton";
-
-        let html5QrCode = null;
-        let scannedQrData = null; // 스캔된 QR 코드 데이터
-        let scannedBarcodeKey = null; // 스캔된 바코드 데이터 (복호화 키)
-
-        const resultBox = document.getElementById(RESULT_BOX_ID);
-        const errorBox = document.getElementById(ERROR_BOX_ID);
-        const startScanButton = document.getElementById(START_SCAN_BUTTON_ID);
-        const stopScanButton = document.getElementById(STOP_SCAN_BUTTON_ID);
-
-        // AES 복호화 함수 (Python 코드의 로직을 JavaScript로 포팅)
-        function decryptData(encryptedBase64Data, keyString) {
-            try {
-                // 키 길이는 16, 24, 32바이트여야 함
-                const keyBytes = CryptoJS.enc.Utf8.parse(keyString);
-                if (keyBytes.sigBytes !== 16 && keyBytes.sigBytes !== 24 && keyBytes.sigBytes !== 32) {
-                    throw new Error(`복호화 키의 길이가 올바르지 않습니다. 현재 ${keyBytes.sigBytes}바이트. 16, 24, 또는 32바이트 키를 사용해야 합니다.`);
-                }
-
-                // Base64로 인코딩된 전체 데이터 파싱
-                const rawData = CryptoJS.enc.Base64.parse(encryptedBase64Data);
-
-                // IV(Initialization Vector) 추출 (첫 16바이트)
-                const iv = CryptoJS.lib.WordArray.create(rawData.words.slice(0, 4)); // 4 words = 16 bytes
-
-                // 암호화된 데이터 추출 (IV 이후)
-                const ciphertext = CryptoJS.lib.WordArray.create(rawData.words.slice(4));
-
-                // AES 복호화 (CBC 모드, IV 사용, NoPadding)
-                const decrypted = CryptoJS.AES.decrypt(
-                    { ciphertext: ciphertext },
-                    keyBytes,
-                    {
-                        iv: iv,
-                        mode: CryptoJS.mode.CBC,
-                        padding: CryptoJS.pad.NoPadding // Python에서 b"\0"으로 패딩했으므로 NoPadding 사용
-                    }
-                );
-
-                // UTF-8 문자열로 변환하고 널 문자('\0') 제거
-                let decryptedString = decrypted.toString(CryptoJS.enc.Utf8);
-                decryptedString = decryptedString.replace(/\0+$/, ''); // 끝에 붙은 널 문자 모두 제거
-
-                if (!decryptedString) {
-                    throw new Error("복호화된 데이터가 비어 있습니다. 올바른 키와 QR 코드인지 확인하세요.");
-                }
-
-                return decryptedString;
-            } catch (e) {
-                console.error("복호화 오류:", e);
-                throw new Error(`복호화에 실패했습니다. 올바른 키를 사용했는지 확인하세요. (${e.message || e})`);
-            }
+        // Service Worker 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered:', registration);
+                    })
+                    .catch(error => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
         }
-
-        // QR 코드 및 바코드 스캔 성공 콜백
-        const onScanSuccess = (decodedText, decodedResult) => {
-            console.log(`Code detected: ${decodedText}, Format: ${decodedResult.result.format.formatName}`);
-
-            errorBox.style.display = 'none';
-            errorBox.innerHTML = '';
-
-            // QR 코드 스캔 시
-            if (decodedResult.result.format.formatName === "QR_CODE") {
-                if (scannedQrData === decodedText) return; // 동일한 QR 코드가 연속 스캔되는 것을 방지
-                scannedQrData = decodedText;
-                resultBox.innerHTML = `<span class="icon">✅</span><p><strong>QR 코드가 스캔되었습니다.</strong> 바코드를 스캔해주세요.</p>`;
-            } 
-            // 바코드 스캔 시 (주요 바코드 형식을 포함)
-            else if (decodedResult.result.format.formatName.startsWith("CODE_") || 
-                       decodedResult.result.format.formatName === "EAN_13" || 
-                       decodedResult.result.format.formatName === "UPC_A" || 
-                       decodedResult.result.format.formatName === "ITF" ||
-                       decodedResult.result.format.formatName === "CODABAR" ||
-                       decodedResult.result.format.formatName === "AZTEC" ||
-                       decodedResult.result.format.formatName === "DATA_MATRIX" ||
-                       decodedResult.result.format.formatName === "PDF_417") {
-                if (scannedBarcodeKey === decodedText) return; // 동일한 바코드가 연속 스캔되는 것을 방지
-                scannedBarcodeKey = decodedText;
-                resultBox.innerHTML = `<span class="icon">✅</span><p><strong>바코드가 스캔되었습니다.</strong> QR 코드를 스캔해주세요.</p>`;
-            } else {
-                // 알 수 없는 형식의 코드 스캔 시
-                resultBox.innerHTML = `<span class="icon">ℹ️</span><p>알 수 없는 코드 형식 스캔됨: ${decodedResult.result.format.formatName}</p>`;
-                return; // 다른 형식이면 복호화 시도 안 함
-            }
-
-            // QR 코드와 바코드(키) 모두 스캔되었으면 복호화 시도
-            if (scannedQrData && scannedBarcodeKey) {
-                stopScanning(); // 스캔 완료 후 스캐너 중지
-
-                try {
-                    const decryptedPassword = decryptData(scannedQrData, scannedBarcodeKey);
-                    resultBox.innerHTML = `<span class="icon">🎉</span><p><strong>복호화된 비밀번호:</strong> <span style="color: var(--secondary-color);">${decryptedPassword}</span></p>`;
-                } catch (e) {
-                    errorBox.style.display = 'flex'; /* flex로 변경하여 아이콘과 텍스트 중앙 정렬 */
-                    errorBox.innerHTML = `<span class="icon">🚫</span><p>${e.message}</p>`;
-                    resultBox.innerHTML = `<span class="icon">❌</span><p>복호화 실패</p>`;
-                }
-                // 다음 스캔을 위해 데이터 초기화
-                scannedQrData = null;
-                scannedBarcodeKey = null;
-            }
-        };
-
-        // QR 코드 스캔 오류 콜백 (디버깅용)
-        const onScanFailure = (error) => {
-            // console.warn(`QR Code scan error = ${error}`);
-            // 지속적인 오류 메시지는 사용자 경험을 해칠 수 있으므로, 치명적인 오류만 표시
-        };
-
-        // 스캔 시작 함수
-        async function startScanning() {
-            // 스캔 시작 전 데이터 초기화
-            scannedQrData = null;
-            scannedBarcodeKey = null;
-
-            resultBox.innerHTML = '<span class="icon">🔍</span><p>QR 코드와 바코드 스캔 대기 중...</p>';
-            errorBox.style.display = 'none';
-            errorBox.innerHTML = '';
-            
-            html5QrCode = new Html5Qrcode(QR_READER_ELEMENT_ID);
-            
-            try {
-                // 사용 가능한 카메라 목록 가져오기
-                const cameras = await Html5Qrcode.getCameras();
-                if (cameras && cameras.length) {
-                    // 첫 번째 카메라 사용 (또는 사용자에게 선택하게 할 수 있음)
-                    await html5QrCode.start(
-                        { facingMode: { exact: "environment" } }, // 후면 카메라 요청 (정확히 일치하는 환경 카메라)
-                        {
-                            fps: 10,    // 프레임당 스캔 시도 횟수
-                            // qrbox 옵션 제거: 전체 카메라 미리보기에서 QR 및 바코드 모두 스캔
-                        },
-                        onScanSuccess,
-                        onScanFailure
-                    );
-                    startScanButton.style.display = 'none';
-                    stopScanButton.style.display = 'inline-block';
-                } else {
-                    throw new Error("카메라를 찾을 수 없습니다. 기기에 카메라가 연결되어 있는지 확인해 주세요.");
-                }
-            } catch (err) {
-                errorBox.style.display = 'flex'; /* flex로 변경하여 아이콘과 텍스트 중앙 정렬 */
-                errorBox.innerHTML = `<span class="icon">🚨</span><p>카메라 시작 오류: ${err.message || err}</p>`;
-                resultBox.innerHTML = '<span class="icon">❌</span><p>스캔 실패</p>';
-                console.error("Camera start failed:", err);
-                stopScanning(); // 오류 발생 시 스캔 중지 상태로 전환
-            }
-        }
-
-        // 스캔 중지 함수
-        async function stopScanning() {
-            if (html5QrCode && html5QrCode.isScanning) {
-                try {
-                    await html5QrCode.stop();
-                    console.log("QR Code scanning stopped.");
-                    html5QrCode.clear(); // 카메라 미리보기 정리
-                    startScanButton.style.display = 'inline-block';
-                    stopScanButton.style.display = 'none';
-                    resultBox.innerHTML = '<span class="icon">⏸️</span><p>스캔이 중지되었습니다. 다시 시작하려면 "스캔 시작"을 눌러주세요.</p>';
-                } catch (err) {
-                    console.error("Failed to stop QR Code scanning:", err);
-                    errorBox.style.display = 'flex'; /* flex로 변경하여 아이콘과 텍스트 중앙 정렬 */
-                    errorBox.innerHTML = `<span class="icon">⚠️</span><p>스캔 중지 오류: ${err.message || err}</p>`;
-                }
-            }
-        }
-
-        // 버튼 이벤트 리스너
-        startScanButton.addEventListener('click', startScanning);
-        stopScanButton.addEventListener('click', stopScanning);
-
-        // 초기 상태 설정
-        resultBox.innerHTML = '<span class="icon">👋</span><p>"스캔 시작"을 눌러 QR 코드와 바코드를 스캔하세요.</p>';
     </script>
 </body>
 </html>
