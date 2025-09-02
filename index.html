@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR 비밀번호 복호화기</title>
+    <!-- PWA: Manifest Link -->
+    <link rel="manifest" href="/manifest.json">
+    <!-- PWA: Apple Touch Icon (iOS 홈 화면 아이콘) - 경로와 크기를 실제 아이콘에 맞춰 조정하세요 -->
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <!-- PWA: 브라우저 UI 테마 색상 설정 -->
+    <meta name="theme-color" content="#007bff">
+
     <!-- CryptoJS 라이브러리 (AES 복호화) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <!-- html5-qrcode 라이브러리 (QR 코드 스캔) -->
@@ -104,7 +111,7 @@
         <div class="key-input-group">
             <input type="password" id="decryptionKeyInput" placeholder="암호화에 사용했던 16바이트 키를 입력하세요.">
         </div>
-        
+
         <div id="qr-reader"></div>
         <div id="qr-reader-results">
             <div id="resultBox" class="result-box">
@@ -112,12 +119,25 @@
             </div>
         </div>
         <div id="errorBox" class="error-box" style="display: none;"></div>
-        
+
         <button id="startScanButton">스캔 시작</button>
         <button id="stopScanButton" style="display: none;">스캔 중지</button>
     </div>
 
     <script>
+        // PWA: Service Worker 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('Service Worker registered! Scope:', registration.scope);
+                    })
+                    .catch(err => {
+                        console.error('Service Worker registration failed:', err);
+                    });
+            });
+        }
+
         const DECRYPTION_KEY_INPUT_ID = "decryptionKeyInput"; // 키 입력 필드 ID
         const QR_READER_ELEMENT_ID = "qr-reader";
         const RESULT_BOX_ID = "resultBox";
@@ -230,9 +250,9 @@
                 resultBox.innerHTML = '<p>스캔 중...</p>';
                 errorBox.style.display = 'none';
                 errorBox.innerHTML = '';
-                
+
                 html5QrCode = new Html5Qrcode(QR_READER_ELEMENT_ID);
-                
+
                 // 사용 가능한 카메라 목록 가져오기
                 const cameras = await Html5Qrcode.getCameras();
                 if (cameras && cameras.length) {
