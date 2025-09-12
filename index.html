@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR 비밀번호 복호화기</title>
+
+    <!-- PWA: Manifest Link -->
+    <link rel="manifest" id="pwa-manifest">
+    <meta name="theme-color" content="#007bff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="QR 복호화기">
+
     <!-- CryptoJS 라이브러리 (AES 복호화) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <!-- html5-qrcode 라이브러리 (QR 코드 스캔) -->
@@ -117,7 +125,153 @@
         <button id="stopScanButton" style="display: none;">스캔 중지</button>
     </div>
 
+    <!-- PWA Manifest JSON 내용 (HTML에 내장) -->
+    <script type="application/json" id="pwa-manifest-data">
+        {
+            "name": "QR 비밀번호 복호화기",
+            "short_name": "QR 복호화기",
+            "description": "QR 코드에서 암호화된 비밀번호를 복호화합니다.",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#f4f4f4",
+            "theme_color": "#007bff",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23007bff' d='M3 3h8v8H3zm0 10h8v8H3zm10-10h8v8h-8zm0 10h8v8h-8z'/%3E%3C/svg%3E",
+                    "sizes": "192x192",
+                    "type": "image/svg+xml"
+                },
+                {
+                    "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23007bff' d='M3 3h8v8H3zm0 10h8v8H3zm10-10h8v8h-8zm0 10h8v8h-8z'/%3E%3C/svg%3E",
+                    "sizes": "512x512",
+                    "type": "image/svg+xml"
+                }
+            ]
+        }
+    </script>
     <script>
+        // HTML 내부에 포함된 JSON 데이터를 사용하여 동적으로 Manifest 링크 생성
+        (function() {
+            const manifestDataScript = document.getElementById('pwa-manifest-data');
+            if (manifestDataScript) {
+                const manifestJson = manifestDataScript.textContent;
+                const encodedManifest = btoa(unescape(encodeURIComponent(manifestJson)));
+                const manifestLink = document.getElementById('pwa-manifest');
+                if (manifestLink) {
+                    manifestLink.href = 'data:application/json;base64,' + encodedManifest;
+                }
+            }
+        })();
+    </script>
+
+    <!-- 서비스 워커 스크립트 (HTML에 내장) -->
+    <script id="sw-script" type="javascript/worker">
+        const CACHE_NAME = 'qr-decryptor-v1';
+        // 캐시할 모든 필수 리소스 목록
+        const urlsToCache = [
+            './', // 현재 HTML 파일 (루트 경로 접근 시)
+            'index.html', // 현재 HTML 파일 (index.html로 직접 접근 시)
+            'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js',
+            'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'
+            // 추가적인 CSS, 이미지 등 정적 리소스가 있다면 여기에 추가
+        ];
+
+        // 서비스 워커 설치 이벤트: 캐시할 리소스 다운로드 및 저장
+        self.addEventListener('install', (event) => {
+            console.log('[Service Worker] Installing...');
+            event.waitUntil(
+                caches.open(CACHE_NAME)
+                    .then((cache) => {
+                        console.log('[Service Worker] Caching all app content');
+                        return cache.addAll(urlsToCache);
+                    })
+                    .catch((error) => {
+                        console.error('[Service Worker] Caching failed:', error);
+                    })
+            );
+            self.skipWaiting(); // 새로운 서비스 워커가 즉시 활성화되도록 함
+        });
+
+        // 서비스 워커 fetch 이벤트: 네트워크 요청을 가로채 캐시된 리소스를 반환
+        self.addEventListener('fetch', (event) => {
+            event.respondWith(
+                caches.match(event.request)
+                    .then((response) => {
+                        // 캐시에 요청과 일치하는 응답이 있으면 캐시된 응답 반환
+                        if (response) {
+                            console.log(`[Service Worker] Serving from cache: ${event.request.url}`);
+                            return response;
+                        }
+                        // 캐시에 없으면 네트워크에서 요청
+                        console.log(`[Service Worker] Fetching from network: ${event.request.url}`);
+                        return fetch(event.request).then((networkResponse) => {
+                            // 성공적인 네트워크 응답을 캐시에 저장 (향후 오프라인 사용을 위해)
+                            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+                                // 현재 페이지의 HTML을 캐시하는 경우, 응답 URL이 캐시 목록에 있는지 확인
+                                const requestUrl = new URL(event.request.url);
+                                const isInternalPage = requestUrl.pathname === '/' || requestUrl.pathname === '/index.html';
+                                
+                                // CDN 리소스는 호스트가 다르므로 직접 URL 비교
+                                const isCachedResource = urlsToCache.some(url => event.request.url.includes(url) || (isInternalPage && (url === './' || url === 'index.html')));
+
+                                if (isCachedResource) {
+                                    return caches.open(CACHE_NAME).then(cache => {
+                                        cache.put(event.request, networkResponse.clone());
+                                        return networkResponse;
+                                    });
+                                }
+                            }
+                            return networkResponse;
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('[Service Worker] Fetch failed:', error);
+                        // 네트워크 오류 발생 시, 오프라인 대체 콘텐츠 제공 등 추가 처리 가능
+                        // 이 앱에서는 단순하게 캐시에서 찾지 못하면 기본적으로 오류를 발생시킴
+                    })
+            );
+        });
+
+        // 서비스 워커 활성화 이벤트: 오래된 캐시 정리
+        self.addEventListener('activate', (event) => {
+            console.log('[Service Worker] Activating...');
+            event.waitUntil(
+                caches.keys().then((cacheNames) => {
+                    return Promise.all(
+                        cacheNames.map((cacheName) => {
+                            if (cacheName !== CACHE_NAME) {
+                                console.log('[Service Worker] Deleting old cache:', cacheName);
+                                return caches.delete(cacheName);
+                            }
+                        })
+                    );
+                })
+            );
+            return self.clients.claim(); // 새로운 서비스 워커가 즉시 제어권을 갖도록 함
+        });
+    </script>
+    
+    <script>
+        // HTML 내부에 포함된 스크립트를 Blob으로 만들어 서비스 워커 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swScript = document.getElementById('sw-script');
+                if (swScript) {
+                    const swContent = swScript.textContent;
+                    const swBlob = new Blob([swContent], { type: 'application/javascript' });
+                    const swUrl = URL.createObjectURL(swBlob); // Blob URL 생성
+
+                    navigator.serviceWorker.register(swUrl, { scope: './' }) // 현재 디렉토리를 scope로 등록
+                        .then(registration => {
+                            console.log('Service Worker registered with scope:', registration.scope);
+                        })
+                        .catch(error => {
+                            console.error('Service Worker registration failed:', error);
+                        });
+                }
+            });
+        }
+
         const DECRYPTION_KEY_INPUT_ID = "decryptionKeyInput"; // 키 입력 필드 ID
         const QR_READER_ELEMENT_ID = "qr-reader";
         const RESULT_BOX_ID = "resultBox";
@@ -209,7 +363,7 @@
 
         // QR 코드 스캔 오류 콜백 (디버깅용)
         const onScanFailure = (error) => {
-            // console.warn(`QR Code scan error = ${error}`);
+            // console.warn(`QR Code scan error = ${error}`); // 너무 상세하므로 실제 서비스에서는 주석 처리
         };
 
         // 스캔 시작 함수
