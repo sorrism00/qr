@@ -100,7 +100,7 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
-            font-size: 1em; /* 모바일에서 클릭 시 화면 확대 방지 및 키보드 활성화 개선 */
+            font-size: 16px; /* 모바일에서 클릭 시 화면 확대 방지 및 키보드 활성화 개선 */
         }
         .key-input-group {
             margin-bottom: 20px;
@@ -111,7 +111,7 @@
     <div class="container">
         <h1>QR 비밀번호 복호화기</h1>
         <div class="key-input-group">
-            <input type="password" id="decryptionKeyInput" placeholder="암호화에 사용했던 16바이트 키를 입력하세요.">
+            <input type="password" id="decryptionKeyInput" placeholder="암호화에 사용했던 16바이트 키를 입력하세요." inputmode="text">
         </div>
         
         <div id="qr-reader"></div>
