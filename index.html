@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR 복호화기 (바코드 스캔 방식)</title>
+    <title>QR 복호화기</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -24,12 +24,11 @@
         }
         h1 { color: var(--primary-color); margin-bottom: 25px; font-weight: 700; }
         .step { background-color: var(--light-gray); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 20px; transition: all 0.3s ease; }
-        .step.disabled { opacity: 0.5; background-color: #f1f1f1; }
         .step h2 { margin-top: 0; margin-bottom: 15px; font-size: 1.1em; color: var(--dark-gray); font-weight: 500; }
-        .key-display { padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background-color: #fff; font-family: 'Courier New', monospace; letter-spacing: 1.5px; color: var(--secondary-color); font-size: 1.1em; margin-bottom: 15px; }
-        .key-display.scanned { color: var(--success-color); font-weight: 700; border-color: var(--success-color); }
+        /* .key-display { padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background-color: #fff; font-family: 'Courier New', monospace; letter-spacing: 1.5px; color: var(--secondary-color); font-size: 1.1em; margin-bottom: 15px; } */ /* 키 표시 제거 */
+        /* .key-display.scanned { color: var(--success-color); font-weight: 700; border-color: var(--success-color); } */ /* 키 표시 제거 */
 
-        /* 수정 1: 스캐너를 화면 전체를 덮는 모달(오버레이)로 변경 */
+        /* 스캐너를 화면 전체를 덮는 모달(오버레이)로 변경 */
         #scanner-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0, 0, 0, 0.75);
@@ -41,24 +40,13 @@
             width: 90%; max-width: 450px; position: relative;
         }
         #qr-reader { width: 100%; border-radius: 8px; overflow: hidden; }
-
-        /* 수정 2: 바코드 전용 가이드 라인 추가 */
-        #barcode-guide {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 90%; height: 80px; border: 3px dashed var(--primary-color);
-            border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
-            pointer-events: none; display: none; /* 평소엔 숨김 */
-        }
         
         .status-box { margin-top: 20px; padding: 12px; border-radius: 6px; font-weight: 500; display: none; word-wrap: break-word; }
         #resultBox { background-color: #f6ffed; border: 1px solid #b7eb8f; color: var(--success-color); font-size: 1.1em; }
         #errorBox { background-color: #fff1f0; border: 1px solid #ffa39e; color: var(--danger-color); }
         
         .action-button { width: 100%; padding: 15px; font-size: 1.1em; font-weight: 700; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
-        #scanKeyButton { background-color: var(--primary-color); }
-        #scanQrButton { background-color: var(--secondary-color); }
-        #scanQrButton:not(:disabled) { background-color: var(--primary-color); }
-        #scanQrButton:disabled { cursor: not-allowed; }
+        #scanQrButton { background-color: var(--primary-color); }
         #closeScannerButton { margin-top: 15px; background-color: var(--secondary-color); }
 
     </style>
@@ -66,14 +54,12 @@
 <body>
     <div class="container">
         <h1>QR 복호화기</h1>
-        <div class="step" id="key-step">
-            <h2>1단계: 키 바코드 스캔</h2>
-            <div id="keyDisplay" class="key-display">키 스캔 대기 중...</div>
-            <button id="scanKeyButton" class="action-button">키 바코드 스캔 시작</button>
-        </div>
-        <div class="step disabled" id="qr-step">
-            <h2>2단계: QR 코드 스캔</h2>
-            <button id="scanQrButton" class="action-button" disabled>QR 코드 스캔하기</button>
+        
+        <!-- 1단계: 고정 복호화 키 섹션 완전히 제거 -->
+
+        <div class="step" id="qr-step">
+            <h2>QR 코드 스캔</h2> <!-- 2단계였던 것을 1단계로 변경된 것처럼 보이도록 제목 수정 -->
+            <button id="scanQrButton" class="action-button">QR 코드 스캔 시작</button>
         </div>
         <div id="resultBox" class="status-box"></div>
         <div id="errorBox" class="status-box"></div>
@@ -83,112 +69,102 @@
     <div id="scanner-overlay">
         <div id="scanner-container">
             <div id="qr-reader"></div>
-            <div id="barcode-guide"></div>
             <button id="closeScannerButton" class="action-button">취소</button>
         </div>
     </div>
 
     <script>
-        const keyDisplay = document.getElementById('keyDisplay');
-        const scanKeyButton = document.getElementById('scanKeyButton');
+        // const keyDisplay = document.getElementById('keyDisplay'); // 키 표시 제거
         const scanQrButton = document.getElementById('scanQrButton');
         const resultBox = document.getElementById('resultBox');
         const errorBox = document.getElementById('errorBox');
-        const qrStepDiv = document.getElementById('qr-step');
         
         // 모달 관련 요소
         const scannerOverlay = document.getElementById('scanner-overlay');
-        const barcodeGuide = document.getElementById('barcode-guide');
         const closeScannerButton = document.getElementById('closeScannerButton');
 
-        let appState = 'IDLE'; // IDLE, KEY_SCANNED, SUCCESS
-        let decryptionKey = null;
+        // 고정된 복호화 키 사용
+        const FIXED_DECRYPTION_KEY = "3133k20084003133";
+        let decryptionKey = FIXED_DECRYPTION_KEY;
+        let appState = 'READY_TO_SCAN'; // 초기 상태를 좀 더 명확하게 변경
+
         let html5QrCode = new Html5Qrcode("qr-reader");
 
+        // UI 업데이트는 이제 간단해짐 (QR 스캔 버튼이 항상 활성화)
         function updateUI() {
-            scanQrButton.disabled = (appState !== 'KEY_SCANNED');
-            qrStepDiv.classList.toggle('disabled', appState !== 'KEY_SCANNED');
+            scanQrButton.disabled = false; // 항상 활성화
         }
+
         function showMessage(type, message) {
             resultBox.style.display = 'none'; errorBox.style.display = 'none';
             const box = type === 'success' ? resultBox : errorBox;
             box.innerHTML = `<p>${message}</p>`; box.style.display = 'block';
         }
 
-        scanKeyButton.addEventListener('click', () => { startKeyScanning(); });
         scanQrButton.addEventListener('click', () => { startQrScanning(); });
         closeScannerButton.addEventListener('click', () => { stopAllScans(); });
         
         async function startScanning(config, successCallback) {
             scannerOverlay.style.display = 'flex';
             try {
-                await html5QrCode.start({ facingMode: "environment" }, config, successCallback, () => {});
+                await html5QrCode.start({ facingMode: "environment" }, config, successCallback, (errorMessage) => {
+                    // console.warn(errorMessage); // 디버깅용
+                });
             } catch (err) {
                 showMessage('error', `카메라 오류: ${err.message}`);
                 stopAllScans();
             }
         }
         
-        function startKeyScanning() {
-            barcodeGuide.style.display = 'block';
-            startScanning({ fps: 10, formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128] }, onBarcodeScanSuccess);
-        }
-        
         function startQrScanning() {
-            barcodeGuide.style.display = 'none';
+            showMessage('', ''); // 스캔 시작 시 이전 메시지 초기화
             startScanning({ fps: 10, qrbox: { width: 250, height: 250 }, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] }, onQrScanSuccess);
         }
 
         async function stopAllScans() {
             if (html5QrCode && html5QrCode.isScanning) {
-                try { await html5QrCode.stop(); } catch (err) {}
+                try { await html5QrCode.stop(); } catch (err) {
+                    // console.error("스캐너 중지 중 오류:", err); // 디버깅용
+                }
             }
             scannerOverlay.style.display = 'none';
             updateUI();
         }
 
-        function onBarcodeScanSuccess(decodedText) {
-            if (/^[a-zA-Z0-9]{16}$/.test(decodedText)) {
-                decryptionKey = decodedText;
-                appState = 'KEY_SCANNED';
-                keyDisplay.textContent = decryptionKey.match(/.{1,4}/g).join(' ');
-                keyDisplay.classList.add('scanned');
-                showMessage('success', '키 바코드 스캔 성공! 2단계에서 QR 코드를 스캔하세요.');
-                stopAllScans();
-            } else {
-                // 바코드는 스캔되었지만 형식이 다를 경우를 대비한 피드백
-                // (일반적으로 formatsToSupport 때문에 발생하지 않음)
-            }
-        }
-
         function onQrScanSuccess(decodedText) {
             stopAllScans();
             try {
-                if (!decryptionKey) throw new Error("키가 먼저 스캔되어야 합니다.");
-                
                 const keyBytes = CryptoJS.enc.Utf8.parse(decryptionKey);
                 const rawData = CryptoJS.enc.Base64.parse(decodedText);
-                const iv = CryptoJS.lib.WordArray.create(rawData.words.slice(0, 4));
-                const ciphertext = CryptoJS.lib.WordArray.create(rawData.words.slice(4));
+                
+                // IV 추출 (Base64 디코딩 후 처음 16바이트 (4 words * 4 bytes/word))
+                const ivWords = rawData.words.slice(0, 4);
+                const iv = CryptoJS.lib.WordArray.create(ivWords, 16); // 16 bytes IV
+
+                // 암호문 추출 (IV 이후의 모든 데이터)
+                const ciphertextWords = rawData.words.slice(4);
+                const ciphertext = CryptoJS.lib.WordArray.create(ciphertextWords, ciphertextWords.length * 4);
 
                 const decrypted = CryptoJS.AES.decrypt({ ciphertext: ciphertext }, keyBytes, {
                     iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7
                 });
 
                 let decryptedPassword = decrypted.toString(CryptoJS.enc.Utf8);
-                if (!decryptedPassword) throw new Error("복호화된 데이터가 없습니다. 키를 확인하세요.");
+                if (!decryptedPassword) throw new Error("복호화된 데이터가 없거나 형식이 올바르지 않습니다. QR 코드를 확인하세요.");
                 
                 showMessage('success', `<strong>복호화 성공:</strong> ${decryptedPassword}`);
-                appState = 'SUCCESS';
+                appState = 'DECRYPTED'; // 복호화 성공 상태
 
             } catch (e) {
                 showMessage('error', `복호화 실패: ${e.message}`);
-                appState = 'KEY_SCANNED'; // 오류 발생 시 QR 재스캔 가능하도록 상태 복귀
+                appState = 'READY_TO_SCAN'; // 오류 발생 시 QR 재스캔 가능하도록 상태 복귀
             }
             updateUI();
         }
 
-        updateUI(); // 초기 UI 상태 설정
+        // 초기 UI 상태 설정 및 안내 메시지
+        showMessage('success', 'QR 코드 스캔 버튼을 눌러 암호화된 QR 코드를 복호화하세요.');
+        updateUI(); 
     </script>
 </body>
 </html>
