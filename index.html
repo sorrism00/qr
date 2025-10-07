@@ -111,7 +111,8 @@
     <div class="container">
         <h1>QR 비밀번호 복호화기</h1>
         <div class="key-input-group">
-            <input type="password" id="decryptionKeyInput" placeholder="암호화에 사용했던 16바이트 키를 입력하세요." inputmode="text">
+            <!-- 변경된 부분: placeholder, maxlength 추가 -->
+            <input type="password" id="decryptionKeyInput" placeholder="암호화 키의 마지막 4자리를 입력하세요." inputmode="text" maxlength="4">
         </div>
         
         <div id="qr-reader"></div>
@@ -273,6 +274,10 @@
             });
         }
 
+        // --- 변경된 부분 시작 ---
+        const KEY_PREFIX = "1q2w3e4r5t6y"; // 고정된 12자리 키 프리픽스
+        // --- 변경된 부분 끝 ---
+
         const DECRYPTION_KEY_INPUT_ID = "decryptionKeyInput"; // 키 입력 필드 ID
         const QR_READER_ELEMENT_ID = "qr-reader";
         const RESULT_BOX_ID = "resultBox";
@@ -281,7 +286,6 @@
         const STOP_SCAN_BUTTON_ID = "stopScanButton";
 
         let html5QrCode = null;
-        let decryptionKey = ""; // 사용자가 입력할 복호화 키
 
         const resultBox = document.getElementById(RESULT_BOX_ID);
         const errorBox = document.getElementById(ERROR_BOX_ID);
@@ -289,43 +293,30 @@
         const stopScanButton = document.getElementById(STOP_SCAN_BUTTON_ID);
         const decryptionKeyInput = document.getElementById(DECRYPTION_KEY_INPUT_ID);
 
-        // AES 복호화 함수 (Python 코드의 로직을 JavaScript로 포팅)
+        // AES 복호화 함수 (수정 없음)
         function decryptData(encryptedBase64Data, keyString) {
             try {
-                // 키 길이는 16, 24, 32바이트여야 함
                 const keyBytes = CryptoJS.enc.Utf8.parse(keyString);
                 if (keyBytes.sigBytes !== 16 && keyBytes.sigBytes !== 24 && keyBytes.sigBytes !== 32) {
-                    throw new Error("키의 길이는 16, 24, 또는 32바이트여야 합니다.");
+                    throw new Error("완성된 키의 길이는 16, 24, 또는 32바이트여야 합니다.");
                 }
-
-                // Base64로 인코딩된 전체 데이터 파싱
                 const rawData = CryptoJS.enc.Base64.parse(encryptedBase64Data);
-
-                // IV(Initialization Vector) 추출 (첫 16바이트)
-                const iv = CryptoJS.lib.WordArray.create(rawData.words.slice(0, 4)); // 4 words = 16 bytes
-
-                // 암호화된 데이터 추출 (IV 이후)
+                const iv = CryptoJS.lib.WordArray.create(rawData.words.slice(0, 4));
                 const ciphertext = CryptoJS.lib.WordArray.create(rawData.words.slice(4));
-
-                // AES 복호화 (CBC 모드, IV 사용, NoPadding)
                 const decrypted = CryptoJS.AES.decrypt(
                     { ciphertext: ciphertext },
                     keyBytes,
                     {
                         iv: iv,
                         mode: CryptoJS.mode.CBC,
-                        padding: CryptoJS.pad.NoPadding // Python에서 b"\0"으로 패딩했으므로 NoPadding 사용
+                        padding: CryptoJS.pad.NoPadding
                     }
                 );
-
-                // UTF-8 문자열로 변환하고 널 문자('\0') 제거
                 let decryptedString = decrypted.toString(CryptoJS.enc.Utf8);
-                decryptedString = decryptedString.replace(/\0+$/, ''); // 끝에 붙은 널 문자 모두 제거
-
+                decryptedString = decryptedString.replace(/\0+$/, '');
                 if (!decryptedString) {
                     throw new Error("복호화된 데이터가 비어 있습니다. 올바른 키와 QR 코드인지 확인하세요.");
                 }
-
                 return decryptedString;
             } catch (e) {
                 console.error("복호화 오류:", e);
@@ -336,74 +327,71 @@
         // QR 코드 스캔 성공 콜백
         const onScanSuccess = (decodedText, decodedResult) => {
             console.log(`QR Code detected: ${decodedText}`);
-            // 스캔이 성공하면 스캐너 중지
             stopScanning();
 
             resultBox.innerHTML = `<p><strong>QR 코드 데이터:</strong> ${decodedText}</p>`;
             errorBox.style.display = 'none';
             errorBox.innerHTML = '';
-
-            // 사용자가 키를 입력했는지 확인
-            const currentKey = decryptionKeyInput.value.trim();
-            if (!currentKey) {
+            
+            // --- 변경된 부분 시작 ---
+            const lastFourChars = decryptionKeyInput.value.trim();
+            if (lastFourChars.length !== 4) { // 4자리가 아니면 오류
                 errorBox.style.display = 'block';
-                errorBox.innerHTML = '<p>오류: 복호화 키를 입력해 주세요.</p>';
-                resultBox.innerHTML = '<p>복호화 키 입력 대기 중...</p>';
+                errorBox.innerHTML = '<p>오류: 키의 마지막 4자리를 정확히 입력해야 합니다.</p>';
+                resultBox.innerHTML = '<p>복호화 키 입력 오류</p>';
                 return;
             }
 
+            // 전체 키 조합
+            const fullKey = KEY_PREFIX + lastFourChars;
+            console.log(`Full decryption key constructed: ${fullKey.substring(0, 12)}****`); // 디버깅 시에도 전체 키 노출 방지
+
             try {
-                const decryptedPassword = decryptData(decodedText, currentKey);
+                // 조합된 전체 키로 복호화 시도
+                const decryptedPassword = decryptData(decodedText, fullKey);
                 resultBox.innerHTML = `<p><strong>복호화된 비밀번호:</strong> <span style="color: blue;">${decryptedPassword}</span></p>`;
             } catch (e) {
                 errorBox.style.display = 'block';
                 errorBox.innerHTML = `<p>${e.message}</p>`;
                 resultBox.innerHTML = '<p>복호화 실패</p>';
             }
+            // --- 변경된 부분 끝 ---
         };
 
-        // QR 코드 스캔 오류 콜백 (디버깅용)
-        const onScanFailure = (error) => {
-            // console.warn(`QR Code scan error = ${error}`); // 너무 상세하므로 실제 서비스에서는 주석 처리
-        };
+        const onScanFailure = (error) => { };
 
         // 스캔 시작 함수
         async function startScanning() {
-            const currentKey = decryptionKeyInput.value.trim();
-            if (!currentKey) {
+            // --- 변경된 부분 시작 ---
+            const lastFourChars = decryptionKeyInput.value.trim();
+            if (lastFourChars.length !== 4) { // 16바이트 대신 4자리 입력 확인
                 errorBox.style.display = 'block';
-                errorBox.innerHTML = '<p>오류: 복호화 키를 입력해 주세요.</p>';
+                errorBox.innerHTML = '<p>오류: 스캔을 시작하려면 키의 마지막 4자리를 입력해야 합니다.</p>';
                 return;
             }
-            try {
-                // 키 길이 유효성 검사 (미리)
-                const keyBytes = CryptoJS.enc.Utf8.parse(currentKey);
-                if (keyBytes.sigBytes !== 16 && keyBytes.sigBytes !== 24 && keyBytes.sigBytes !== 32) {
-                    throw new Error("키의 길이는 16, 24, 또는 32바이트여야 합니다.");
-                }
+            // --- 변경된 부분 끝 ---
 
+            try {
                 resultBox.innerHTML = '<p>스캔 중...</p>';
                 errorBox.style.display = 'none';
                 errorBox.innerHTML = '';
                 
                 html5QrCode = new Html5Qrcode(QR_READER_ELEMENT_ID);
                 
-                // 사용 가능한 카메라 목록 가져오기
                 const cameras = await Html5Qrcode.getCameras();
                 if (cameras && cameras.length) {
-                    // 첫 번째 카메라 사용 (또는 사용자에게 선택하게 할 수 있음)
                     await html5QrCode.start(
-                        { facingMode: { exact: "environment" } }, // 후면 카메라 요청 (정확히 일치하는 환경 카메라)
+                        { facingMode: "environment" }, // 후면 카메라 우선
                         {
-                            fps: 10,    // 프레임당 스캔 시도 횟수
-                            qrbox: { width: 250, height: 250 } // QR 코드 스캔 영역
+                            fps: 10,
+                            qrbox: { width: 250, height: 250 }
                         },
                         onScanSuccess,
                         onScanFailure
                     );
                     startScanButton.style.display = 'none';
                     stopScanButton.style.display = 'inline-block';
-                    decryptionKeyInput.disabled = true; // 스캔 중에는 키 변경 불가
+                    decryptionKeyInput.disabled = true;
                 } else {
                     throw new Error("카메라를 찾을 수 없습니다.");
                 }
@@ -412,20 +400,19 @@
                 errorBox.innerHTML = `<p>카메라 시작 오류: ${err.message || err}</p>`;
                 resultBox.innerHTML = '<p>스캔 실패</p>';
                 console.error("Camera start failed:", err);
-                stopScanning(); // 오류 발생 시 스캔 중지 상태로 전환
+                stopScanning();
             }
         }
 
-        // 스캔 중지 함수
         async function stopScanning() {
             if (html5QrCode && html5QrCode.isScanning) {
                 try {
                     await html5QrCode.stop();
                     console.log("QR Code scanning stopped.");
-                    html5QrCode.clear(); // 카메라 미리보기 정리
+                    html5QrCode.clear();
                     startScanButton.style.display = 'inline-block';
                     stopScanButton.style.display = 'none';
-                    decryptionKeyInput.disabled = false; // 스캔 중지 후 키 변경 가능
+                    decryptionKeyInput.disabled = false;
                 } catch (err) {
                     console.error("Failed to stop QR Code scanning:", err);
                     errorBox.style.display = 'block';
@@ -434,12 +421,10 @@
             }
         }
 
-        // 버튼 이벤트 리스너
         startScanButton.addEventListener('click', startScanning);
         stopScanButton.addEventListener('click', stopScanning);
 
-        // 초기 상태 설정
-        resultBox.innerHTML = '<p>복호화 키를 입력하고 "스캔 시작"을 눌러주세요.</p>';
+        resultBox.innerHTML = '<p>키의 마지막 4자리를 입력하고 "스캔 시작"을 눌러주세요.</p>';
     </script>
 </body>
 </html>
