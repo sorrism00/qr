@@ -150,6 +150,15 @@
                 });
 
                 let decryptedPassword = decrypted.toString(CryptoJS.enc.Utf8);
+                
+                // --- 추가된 로직 시작 ---
+                // 복호화된 텍스트가 .html로 끝나는 경우 해당 HTML 파일을 엽니다.
+                if (decryptedPassword && decryptedPassword.endsWith('.html')) {
+                    window.location.href = decryptedPassword;
+                    return; // 페이지 이동 후 함수 실행을 중단합니다.
+                }
+                // --- 추가된 로직 끝 ---
+
                 if (!decryptedPassword) throw new Error("복호화된 데이터가 없거나 형식이 올바르지 않습니다. QR 코드를 확인하세요.");
                 
                 showMessage('success', `<strong>복호화 성공:</strong> ${decryptedPassword}`);
@@ -167,4 +176,4 @@
         updateUI(); 
     </script>
 </body>
-</html>
+</html>```
