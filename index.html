@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR 비밀번호 복호화기 (OCR + 수동)</title>
+    <title>QR 복호화기 (OCR + 수동)</title>
 
     <!-- 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
@@ -13,130 +13,63 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
         :root {
-            --primary-color: #007bff;
-            --secondary-color: #6c757d;
-            --success-color: #28a745;
-            --danger-color: #dc3545;
-            --light-gray: #f8f9fa;
-            --dark-gray: #343a40;
-            --border-color: #dee2e6;
+            --primary-color: #007bff; --secondary-color: #6c757d; --success-color: #28a745;
+            --danger-color: #dc3545; --light-gray: #f8f9fa; --dark-gray: #343a40; --border-color: #dee2e6;
         }
         body {
-            font-family: 'Noto Sans KR', Arial, sans-serif;
-            margin: 0;
-            padding: 15px;
-            background-color: var(--light-gray);
-            color: var(--dark-gray);
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
+            font-family: 'Noto Sans KR', Arial, sans-serif; margin: 0; padding: 15px; background-color: var(--light-gray);
+            color: var(--dark-gray); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh;
         }
         .container {
-            background-color: #fff;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            width: 100%;
-            max-width: 500px;
-            box-sizing: border-box;
-            text-align: center;
+            background-color: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            width: 100%; max-width: 500px; box-sizing: border-box; text-align: center;
         }
-        h1 {
-            color: var(--primary-color);
-            margin-bottom: 25px;
-            font-weight: 700;
-        }
-        .step {
-            background-color: var(--light-gray);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .step h2 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 1.1em;
-            color: var(--dark-gray);
-            font-weight: 500;
-        }
-        .key-input-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        h1 { color: var(--primary-color); margin-bottom: 25px; font-weight: 700; }
+        .step { background-color: var(--light-gray); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .step h2 { margin-top: 0; margin-bottom: 15px; font-size: 1.1em; color: var(--dark-gray); font-weight: 500; }
+        .key-input-wrapper { display: flex; align-items: center; gap: 10px; }
+        
+        /* 수정 1: 입력란 너비 및 스타일 조정 */
         #decryptionKeyInput {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 1em;
-            letter-spacing: 2px;
-            font-family: monospace;
+            flex: 1; /* 남는 공간을 모두 차지하도록 변경 */
+            min-width: 0; /* flex item의 크기가 줄어들 수 있도록 허용 */
+            padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1em;
+            letter-spacing: 1.5px; /* 가독성을 위해 약간 줄임 */
+            font-family: 'Courier New', Courier, monospace; /* OCR 인식률이 높은 고정폭 글꼴 사용 */
         }
-        #decryptionKeyInput:disabled {
-            background-color: #e9ecef;
-            cursor: not-allowed;
-        }
-        .icon-button {
-            padding: 8px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            opacity: 0.7;
-            transition: opacity 0.2s;
-        }
+        #decryptionKeyInput:disabled { background-color: #e9ecef; cursor: not-allowed; }
+
+        .icon-button { padding: 8px; background: none; border: none; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; }
         .icon-button:hover { opacity: 1; }
         .icon-button img { width: 24px; height: 24px; }
         
-        #scanner-container {
-            display: none;
-            margin-top: 20px;
-            position: relative;
-        }
-        #qr-reader {
-            width: 100%;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            overflow: hidden;
-        }
+        #scanner-container { display: none; margin-top: 20px; position: relative; }
+        #qr-reader { width: 100%; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
         #ocr-guide {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            height: 50px;
-            border: 3px dashed var(--primary-color);
-            border-radius: 10px;
-            box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
-            pointer-events: none;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 85%; height: 50px; border: 3px dashed var(--primary-color); border-radius: 10px;
+            box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); pointer-events: none;
         }
         
-        .status-box {
-            margin-top: 20px; padding: 12px; border-radius: 6px; font-weight: 500;
-            display: none; word-wrap: break-word;
-        }
+        .status-box { margin-top: 20px; padding: 12px; border-radius: 6px; font-weight: 500; display: none; word-wrap: break-word; }
         #statusBox { background-color: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
         #resultBox { background-color: #f6ffed; border: 1px solid #b7eb8f; color: var(--success-color); font-size: 1.1em; }
         #errorBox { background-color: #fff1f0; border: 1px solid #ffa39e; color: var(--danger-color); }
         
         #mainActionButton {
-            width: 100%; padding: 15px; font-size: 1.1em; font-weight: 700;
-            color: #fff; background-color: var(--secondary-color);
+            width: 100%; padding: 15px; font-size: 1.1em; font-weight: 700; color: #fff; background-color: var(--secondary-color);
             border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;
         }
         #mainActionButton:not(:disabled) { background-color: var(--primary-color); }
         #mainActionButton:disabled { cursor: not-allowed; }
+        
+        /* OCR 전처리를 위한 숨겨진 캔버스 */
+        #ocr-canvas { display: none; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>QR 복호화기</h1>
-        
-        <!-- 1단계: 키 입력 -->
         <div class="step" id="key-step">
             <h2>1단계: 복호화 키 입력</h2>
             <div class="key-input-wrapper">
@@ -146,16 +79,13 @@
                 </button>
             </div>
         </div>
-
-        <!-- 2단계: QR 스캔 -->
         <div class="step" id="qr-step">
             <h2>2단계: QR 코드 스캔</h2>
             <button id="mainActionButton" disabled>QR 코드 스캔하기</button>
         </div>
-
-        <!-- 스캐너 및 결과 표시 영역 -->
         <div id="scanner-container">
             <div id="qr-reader"></div>
+            <canvas id="ocr-canvas"></canvas> <!-- OCR 전처리용 캔버스 -->
             <div id="ocr-guide" style="display: none;"></div>
         </div>
         <div id="statusBox" class="status-box"></div>
@@ -164,53 +94,52 @@
     </div>
 
     <script>
+        // ... (변수 선언은 이전과 동일) ...
         const decryptionKeyInput = document.getElementById('decryptionKeyInput');
         const scanKeyButton = document.getElementById('scanKeyButton');
         const mainActionButton = document.getElementById('mainActionButton');
         const scannerContainer = document.getElementById('scanner-container');
-        const qrReaderDiv = document.getElementById('qr-reader');
         const ocrGuide = document.getElementById('ocr-guide');
+        const ocrCanvas = document.getElementById('ocr-canvas'); // 캔버스 요소 추가
         const statusBox = document.getElementById('statusBox');
         const resultBox = document.getElementById('resultBox');
         const errorBox = document.getElementById('errorBox');
 
-        let appState = 'IDLE'; // IDLE, SCANNING_KEY, KEY_CONFIRMED, SCANNING_QR, SUCCESS
-        let decryptionKey = null;
-        let tesseractWorker = null;
+        let appState = 'IDLE'; let decryptionKey = null; let tesseractWorker = null;
         let html5QrCode = new Html5Qrcode("qr-reader");
 
         // --- 초기화 ---
         window.addEventListener('load', async () => {
             updateUI();
-            showStatus('OCR 엔진을 초기화하는 중... 잠시만 기다려주세요.');
-            tesseractWorker = await Tesseract.createWorker('eng');
-            showStatus('준비 완료. 키를 입력하거나 스캔하세요.', 'success');
+            showStatus('OCR 엔진 초기화 중... 잠시만 기다려주세요.');
+            try {
+                // 수정 3: Tesseract 워커 생성 시 Whitelist 설정 추가
+                tesseractWorker = await Tesseract.createWorker('eng');
+                await tesseractWorker.setParameters({
+                    tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                });
+                showStatus('준비 완료. 키를 입력하거나 스캔하세요.', 'success');
+            } catch (err) {
+                showStatus('OCR 엔진 초기화 실패. 새로고침 해주세요.', 'error');
+                scanKeyButton.disabled = true;
+            }
         });
 
         // --- UI 상태 관리 ---
         function updateUI() {
-            // 버튼 상태
             const isKeyReady = decryptionKeyInput.value.replace(/\s/g, '').length === 16;
             mainActionButton.disabled = !isKeyReady;
-
-            // 버튼 텍스트 및 기능
             if (appState === 'SCANNING_KEY' || appState === 'SCANNING_QR') {
-                mainActionButton.textContent = '스캔 중지';
-                mainActionButton.disabled = false;
+                mainActionButton.textContent = '스캔 중지'; mainActionButton.disabled = false;
                 mainActionButton.style.backgroundColor = 'var(--danger-color)';
             } else {
                 mainActionButton.textContent = 'QR 코드 스캔하기';
                 mainActionButton.style.backgroundColor = isKeyReady ? 'var(--primary-color)' : 'var(--secondary-color)';
             }
         }
-        
         function showStatus(message, type = 'info') {
             [statusBox, resultBox, errorBox].forEach(box => box.style.display = 'none');
-            let targetBox;
-            if (type === 'info') targetBox = statusBox;
-            else if (type === 'success') targetBox = resultBox;
-            else if (type === 'error') targetBox = errorBox;
-            
+            let targetBox = type === 'info' ? statusBox : type === 'success' ? resultBox : errorBox;
             if (targetBox) {
                 targetBox.innerHTML = `<p>${message}</p>`;
                 targetBox.style.display = 'block';
@@ -219,127 +148,97 @@
 
         // --- 이벤트 리스너 ---
         decryptionKeyInput.addEventListener('input', (e) => {
-            // 4자리마다 공백 자동 추가
+            // 수정 2: toUpperCase() 제거하여 소문자 입력 허용
             let value = e.target.value.replace(/\s/g, '').replace(/[^a-zA-Z0-9]/g, '');
-            let formattedValue = (value.match(/.{1,4}/g) || []).join(' ').toUpperCase();
+            let formattedValue = (value.match(/.{1,4}/g) || []).join(' ');
             e.target.value = formattedValue;
             updateUI();
         });
-        
-        scanKeyButton.addEventListener('click', () => {
-            if (appState === 'SCANNING_KEY') {
-                stopAllScans();
-            } else {
-                startKeyScanning();
-            }
-        });
-
+        scanKeyButton.addEventListener('click', () => { appState === 'SCANNING_KEY' ? stopAllScans() : startKeyScanning(); });
         mainActionButton.addEventListener('click', () => {
-            if (appState === 'SCANNING_KEY' || appState === 'SCANNING_QR') {
-                stopAllScans();
-            } else if (mainActionButton.disabled === false) {
-                startQrScanning();
-            }
+            if (appState === 'SCANNING_KEY' || appState === 'SCANNING_QR') stopAllScans();
+            else if (!mainActionButton.disabled) startQrScanning();
         });
 
         // --- 스캔 로직 ---
         async function startKeyScanning() {
-            appState = 'SCANNING_KEY';
-            decryptionKeyInput.disabled = true;
-            scannerContainer.style.display = 'block';
-            ocrGuide.style.display = 'block';
-            showStatus('카메라로 16자리 키를 가이드라인에 맞춰주세요.');
-            updateUI();
-
+            appState = 'SCANNING_KEY'; decryptionKeyInput.disabled = true; scannerContainer.style.display = 'block';
+            ocrGuide.style.display = 'block'; showStatus('카메라로 16자리 키를 가이드라인에 맞춰주세요.'); updateUI();
             try {
                 const cameras = await Html5Qrcode.getCameras();
                 if (!cameras || !cameras.length) throw new Error("카메라를 찾을 수 없습니다.");
-                const rearCameraId = cameras.length > 1 ? cameras[cameras.length - 1].id : cameras[0].id;
-
-                await html5QrCode.start(rearCameraId, { fps: 5 }, () => {}); // QR 스캔 콜백은 비워둠
-
+                const rearCameraId = cameras.find(c => c.label.toLowerCase().includes('back'))?.id || cameras[cameras.length - 1].id;
+                await html5QrCode.start(rearCameraId, { fps: 2 }, () => {}); // OCR은 프레임 낮춰도 됨
                 recognizeLoop();
-            } catch (err) {
-                showStatus(`카메라 시작 오류: ${err.message}`, 'error');
-                stopAllScans();
-            }
+            } catch (err) { showStatus(`카메라 오류: ${err.message}`, 'error'); stopAllScans(); }
         }
 
         async function recognizeLoop() {
             if (appState !== 'SCANNING_KEY') return;
             const videoElement = document.querySelector('#qr-reader video');
-            if (videoElement) {
-                const { data } = await tesseractWorker.recognize(videoElement);
-                const potentialKey = data.text.replace(/[\s\W]/g, '').toUpperCase();
+            if (videoElement && videoElement.readyState >= 2) {
+                // 수정 4: 이미지 전처리 로직 추가
+                const ctx = ocrCanvas.getContext('2d', { willReadFrequently: true });
+                ocrCanvas.width = videoElement.videoWidth;
+                ocrCanvas.height = videoElement.videoHeight;
                 
-                if (/^[A-Z0-9]{16}$/.test(potentialKey)) {
+                // 1. 흑백으로 변환하여 대비를 높임
+                ctx.filter = 'grayscale(1) contrast(1.5)';
+                ctx.drawImage(videoElement, 0, 0, ocrCanvas.width, ocrCanvas.height);
+
+                // 2. 전처리된 캔버스 이미지를 OCR 엔진에 전달
+                const { data } = await tesseractWorker.recognize(ocrCanvas);
+                const potentialKey = data.text.replace(/[\s\W]/g, '');
+                
+                showStatus(`인식 시도 중... (정확도: ${data.confidence.toFixed(0)}%)<br><code>${potentialKey}</code>`, 'info');
+
+                if (/^[a-zA-Z0-9]{16}$/.test(potentialKey) && data.confidence > 65) {
                     decryptionKeyInput.value = (potentialKey.match(/.{1,4}/g) || []).join(' ');
                     showStatus('키 인식 성공!', 'success');
                     stopAllScans();
+                } else {
+                    requestAnimationFrame(recognizeLoop); // 계속 시도
                 }
+            } else {
+                requestAnimationFrame(recognizeLoop);
             }
-            requestAnimationFrame(recognizeLoop);
         }
 
         async function startQrScanning() {
-            appState = 'SCANNING_QR';
-            decryptionKey = decryptionKeyInput.value.replace(/\s/g, '');
-            decryptionKeyInput.disabled = true;
-            scannerContainer.style.display = 'block';
-            ocrGuide.style.display = 'none';
-            showStatus('QR 코드를 스캔하세요.');
-            updateUI();
-
+            // ... (QR 스캔 로직은 이전과 동일)
+            appState = 'SCANNING_QR'; decryptionKey = decryptionKeyInput.value.replace(/\s/g, '');
+            decryptionKeyInput.disabled = true; scannerContainer.style.display = 'block';
+            ocrGuide.style.display = 'none'; showStatus('QR 코드를 스캔하세요.'); updateUI();
             try {
-                await html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                    onScanSuccess,
-                    () => {}
-                );
-            } catch (err) {
-                showStatus(`카메라 시작 오류: ${err.message}`, 'error');
-                stopAllScans();
-            }
+                await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, () => {});
+            } catch (err) { showStatus(`카메라 시작 오류: ${err.message}`, 'error'); stopAllScans(); }
         }
 
         async function stopAllScans() {
+            // ... (스캔 중지 로직은 이전과 동일)
             if (html5QrCode && html5QrCode.isScanning) {
-                try {
-                    await html5QrCode.stop();
-                } catch (err) { console.error("스캔 중지 오류:", err); }
+                try { await html5QrCode.stop(); } catch (err) { console.error("스캔 중지 오류:", err); }
             }
-            scannerContainer.style.display = 'none';
-            ocrGuide.style.display = 'none';
-            decryptionKeyInput.disabled = false;
-            appState = 'IDLE';
-            updateUI();
+            scannerContainer.style.display = 'none'; ocrGuide.style.display = 'none'; decryptionKeyInput.disabled = false;
+            appState = 'IDLE'; updateUI();
         }
 
         // --- 복호화 로직 ---
         const onScanSuccess = (decodedText) => {
+            // ... (복호화 로직은 이전과 동일)
             stopAllScans();
             try {
                 const keyString = decryptionKeyInput.value.replace(/\s/g, '');
                 if (keyString.length !== 16) throw new Error("키는 반드시 16자리여야 합니다.");
-
                 const keyBytes = CryptoJS.enc.Utf8.parse(keyString);
                 const rawData = CryptoJS.enc.Base64.parse(decodedText);
                 const iv = CryptoJS.lib.WordArray.create(rawData.words.slice(0, 4));
                 const ciphertext = CryptoJS.lib.WordArray.create(rawData.words.slice(4));
-
-                const decrypted = CryptoJS.AES.decrypt({ ciphertext: ciphertext }, keyBytes, {
-                    iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding
-                });
-
+                const decrypted = CryptoJS.AES.decrypt({ ciphertext: ciphertext }, keyBytes, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding });
                 let decryptedPassword = decrypted.toString(CryptoJS.enc.Utf8).replace(/\0+$/, '');
                 if (!decryptedPassword) throw new Error("복호화된 데이터가 없습니다. 키를 확인하세요.");
-                
                 showStatus(`<strong>복호화 성공:</strong> ${decryptedPassword}`, 'success');
-
-            } catch (e) {
-                showStatus(`복호화 실패: ${e.message}`, 'error');
-            }
+            } catch (e) { showStatus(`복호화 실패: ${e.message}`, 'error'); }
         };
 
     </script>
